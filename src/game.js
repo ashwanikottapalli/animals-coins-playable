@@ -104,13 +104,34 @@ export class Game {
     this.player.tutorialPaused = true;
     this.player.setAnimation('idle');
     this.ui.showTutorial();
-    // First drag both dismisses the tutorial AND unlocks audio
-    // (browsers block AudioContext until a user gesture).
+
+    // Try to unlock + play the intro voiceover immediately. Inside ad networks
+    // this works because the ad iframe is already gestured-into; on dev / web
+    // browsers it queues until first interaction.
+    this.audio.unlock();
+    this.audio.startMusic();
+    this.audio.play('voice_intro');
+
+    // Global gesture fallback — *any* click or keypress on the page also
+    // attempts to unlock audio. Critical because a user might click to focus
+    // the iframe without ever dragging the bear, and we still want voice to
+    // play. Self-removes once the context is running.
+    const tryUnlock = () => {
+      this.audio.unlock();
+      if (this.audio.ctx?.state === 'running') {
+        document.removeEventListener('pointerdown', tryUnlock);
+        document.removeEventListener('keydown', tryUnlock);
+        document.removeEventListener('touchstart', tryUnlock);
+      }
+    };
+    document.addEventListener('pointerdown', tryUnlock);
+    document.addEventListener('keydown', tryUnlock);
+    document.addEventListener('touchstart', tryUnlock, { passive: true });
+
+    // First drag dismisses tutorial; audio unlock is also retried here as
+    // belt-and-suspenders in case all the above somehow missed.
     this.player.onMoveStart = () => {
       this.audio.unlock();
-      this.audio.startMusic();
-      // Greeting voiceover (queues if file is still loading).
-      this.audio.play('voice_intro');
       this._dismissTutorial();
     };
   }

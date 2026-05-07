@@ -17,36 +17,57 @@ export class Audio {
     this.master = null;
     this.unlocked = false;
     this.muted = false;
-    this._buffers = new Map();   // name -> AudioBuffer (loaded files)
+    this._buffers = new Map();   // name -> { buffer, gain }
     this._loading = new Map();   // name -> Promise<void>
+    this._pending = [];          // names queued while ctx is suspended
   }
 
+  // Idempotent. First call creates the AudioContext (browsers create it
+  // suspended without a user gesture). Subsequent calls (typically on first
+  // user gesture) actually resume() the ctx, which drains queued plays.
   unlock() {
-    if (this.unlocked) return;
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) { console.warn('[audio] Web Audio API not available'); return; }
-    this.ctx = new Ctx();
-    this.master = this.ctx.createGain();
-    this.master.gain.value = 0.5;
-    this.master.connect(this.ctx.destination);
-    if (this.ctx.state === 'suspended') this.ctx.resume();
-    // iOS Safari: nudge with a 1-sample silent buffer to truly unlock.
-    const buf = this.ctx.createBuffer(1, 1, 22050);
-    const src = this.ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(this.ctx.destination);
-    src.start(0);
-    this.unlocked = true;
 
-    // Auto-load voice / music files. Each is optional; the play() call falls
-    // back to procedural sound if the file isn't there.
-    this.loadFile('voice_intro', 'assets/audio/voice_intro.mp3');
-    this.loadFile('voice_end',   'assets/audio/voice_end.mp3');
+    if (!this.ctx) {
+      this.ctx = new Ctx();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.5;
+      this.master.connect(this.ctx.destination);
+      this.ctx.addEventListener('statechange', () => {
+        if (this.ctx.state === 'running') this._drainPending();
+      });
+      // Auto-load voice files (decodeAudioData works in suspended state).
+      this.loadFile('voice_intro', 'assets/audio/voice_intro.mp3');
+      this.loadFile('voice_end',   'assets/audio/voice_end.mp3');
+    }
+
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {}); // no-op if browser blocks
+    }
+    // iOS Safari: silent buffer nudge once context is running.
+    if (this.ctx.state === 'running') {
+      const buf = this.ctx.createBuffer(1, 1, 22050);
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(this.ctx.destination);
+      try { src.start(0); } catch {}
+    }
+    this.unlocked = true;
+  }
+
+  _drainPending() {
+    while (this._pending.length) {
+      const name = this._pending.shift();
+      this.play(name);
+    }
   }
 
   // Async-load an audio file into a named buffer slot.
+  // Only requires the AudioContext to exist (decodeAudioData works while
+  // suspended); doesn't wait for the unlock-by-gesture flag.
   loadFile(name, url, gain = 1.0) {
-    if (!this.unlocked) return Promise.resolve();
+    if (!this.ctx) return Promise.resolve();
     if (this._buffers.has(name) || this._loading.has(name)) {
       return this._loading.get(name) || Promise.resolve();
     }
@@ -70,7 +91,15 @@ export class Audio {
   }
 
   play(name) {
-    if (!this.unlocked || this.muted || !this.ctx) return;
+    if (this.muted || !this.ctx) return;
+
+    // Context not yet running (audio not unlocked by gesture) — queue and
+    // replay when state flips to 'running'. Keep the most recent of each name
+    // so duplicate calls don't stack up.
+    if (this.ctx.state !== 'running') {
+      if (!this._pending.includes(name)) this._pending.push(name);
+      return;
+    }
 
     // Prefer a loaded audio file over procedural recipe.
     if (this._buffers.has(name)) return this._playBuffer(name);
