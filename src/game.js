@@ -332,10 +332,18 @@ export class Game {
   }
 
   _followCamera(dt) {
+    // Dynamic zoom-back: as the plank stack grows the bear becomes very tall.
+    // We pull the camera up + back proportional to plank count so the whole
+    // stack stays in frame, capped so it doesn't run away on huge counts.
+    const stackBoost = Math.min(1, this.plankSystem.count / 25); // 0..1
+    const yBoost = stackBoost * 1.6;
+    const zBoost = stackBoost * 1.6;
+    const lookYBoost = stackBoost * 0.9;
+
     const tgt = new THREE.Vector3(
       this.player.position.x * 0.4 + CONFIG.cameraOffset.x,
-      this.player.position.y + CONFIG.cameraOffset.y,
-      this.player.position.z + CONFIG.cameraOffset.z
+      this.player.position.y + CONFIG.cameraOffset.y + yBoost,
+      this.player.position.z + CONFIG.cameraOffset.z - zBoost,   // -z = further behind
     );
     this.camera.position.lerp(tgt, CONFIG.cameraLerp);
 
@@ -348,7 +356,7 @@ export class Game {
 
     this.camera.lookAt(
       this.player.position.x * 0.5,
-      this.player.position.y + 0.8,
+      this.player.position.y + 0.8 + lookYBoost,
       this.player.position.z + CONFIG.cameraLookAhead
     );
   }
