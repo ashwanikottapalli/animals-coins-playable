@@ -40,6 +40,19 @@ export class UI {
 
   showTutorial() { this.tutorial.classList.remove('hidden'); }
   hideTutorial() { this.tutorial.classList.add('hidden'); }
+
+  // Spawn a transient floating "+10" / "−2" / "×3" indicator at app coords (x, y).
+  // `positive` flips the color: green for + / ×, red for - / ÷.
+  spawnFloatingText(text, x, y, positive) {
+    const el = document.createElement('div');
+    el.className = 'floatTxt' + (positive ? ' good' : ' bad');
+    el.textContent = text;
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    document.getElementById('app').appendChild(el);
+    // CSS animation runs on insertion; remove after it finishes.
+    setTimeout(() => el.remove(), 900);
+  }
 }
 
 function isIOS() {

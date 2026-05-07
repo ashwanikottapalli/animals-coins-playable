@@ -6,6 +6,7 @@ import { PlankSystem } from './plankSystem.js';
 import { applyGateOp } from './mathGate.js';
 import { UI } from './ui.js';
 import { Audio } from './audio.js';
+import { ParticleSystem } from './particles.js';
 
 const STATE = {
   INTRO: 'intro',
@@ -33,13 +34,57 @@ export class Game {
     this.level = buildLevel(this.scene);
     this.player = new Player(this.scene);
     this.plankSystem = new PlankSystem(this.scene, this.level, this.player);
+    this.particles = new ParticleSystem(this.scene);
     this.plankSystem.onCountChange = (n) => this.ui.setPlankCount(n);
+    this.plankSystem.onBridgePlank = (pos) => {
+      this.audio.play('thud');
+      this.particles.emit(pos, 3, {
+        kind: 'dust',
+        color: [0xc8b48a, 0xe8d8b0],
+        size: 9, sizeEnd: 0, speed: 0.9, gravity: -2.5, lifetime: 0.35, upBias: 0.6, spread: 0.7,
+      });
+    };
+    this.plankSystem.onWallRung = (pos) => {
+      this.audio.play('thud');
+      this.particles.emit(pos, 5, {
+        kind: 'sparkle',
+        color: [0x9be0e0, 0xffffff],
+        size: 8, sizeEnd: 0, speed: 1.6, gravity: -4, lifetime: 0.4, upBias: 0.6, spread: 0.9,
+      });
+    };
     this.ui.setPlankCount(this.plankSystem.count);
+
+    // Camera shake state — small impulse-driven offset added on top of follow cam.
+    this._shake = { intensity: 0, decay: 6 };
+    // Footstep dust cadence
+    this._footstepTimer = 0;
 
     this.ui.bindRetry(() => this.reset());
 
     // No tap-to-play splash anymore; jump straight into the tutorial state.
     this.start();
+  }
+
+  shakeCamera(intensity = 0.15, decay = 6) {
+    this._shake.intensity = Math.max(this._shake.intensity, intensity);
+    this._shake.decay = decay;
+  }
+
+  // Project a world point to the #app coordinate space and ask the UI to
+  // render a transient floating text there.
+  _showFloatingChange(text, positive) {
+    const v = new THREE.Vector3(
+      this.player.position.x,
+      this.player.position.y + 1.6,
+      this.player.position.z + 0.3,
+    );
+    v.project(this.camera);
+    const appEl = document.getElementById('app');
+    const w = appEl.clientWidth;
+    const h = appEl.clientHeight;
+    const x = (v.x * 0.5 + 0.5) * w;
+    const y = (-v.y * 0.5 + 0.5) * h;
+    this.ui.spawnFloatingText(text, x, y, positive);
   }
 
   start() {
@@ -50,10 +95,13 @@ export class Game {
     this.player.tutorialPaused = true;
     this.player.setAnimation('idle');
     this.ui.showTutorial();
-    this.player.onMoveStart = () => this._dismissTutorial();
-
-    this.audio.unlock();
-    this.audio.startMusic();
+    // First drag both dismisses the tutorial AND unlocks audio
+    // (browsers block AudioContext until a user gesture).
+    this.player.onMoveStart = () => {
+      this.audio.unlock();
+      this.audio.startMusic();
+      this._dismissTutorial();
+    };
   }
 
   _dismissTutorial() {
@@ -82,8 +130,15 @@ export class Game {
       this.player.setAnimation('idle');
     } else if (playing) {
 
-      // Pickups
-      this.plankSystem.pickupCheck();
+      // Pickups — minimal sparkle (4-point star) on each plank collected
+      this.plankSystem.pickupCheck((pickup) => {
+        this.audio.play('pickup');
+        this.particles.emit(pickup.position, 4, {
+          kind: 'sparkle',
+          color: [0xa6f4ee, 0xffffff],
+          size: 9, sizeEnd: 0, speed: 2.2, gravity: -6, lifetime: 0.32, upBias: 0.8,
+        });
+      });
 
       // Anticipate ground (lookahead a bit)
       const lookAheadZ = this.player.position.z + CONFIG.plankSize.z * 1.5;
@@ -163,26 +218,42 @@ export class Game {
           const after = applyGateOp(before, g.op, g.value);
           this.plankSystem.setCount(after);
           g.applied = true;
-          // Quick scale punch on the gate
           g.group.userData._t0 = this._time;
-        }
-      }
-      // Animate gate punch
-      for (const g of this.level.gates) {
-        const t0 = g.group.userData._t0;
-        if (t0 != null) {
-          const dt2 = this._time - t0;
-          const k = Math.max(0, 1 - dt2 / 0.25);
-          const s = 1 + k * 0.18;
-          g.group.scale.setScalar(s);
-          if (dt2 > 0.4) g.group.userData._t0 = null;
-        }
-      }
 
+          // Shatter the panel — keep the posts standing
+          if (g.panel) g.panel.visible = false;
+
+          const positive = g.op === 'add' || g.op === 'multiply';
+
+          // Audio: shatter + ascending/descending tone
+          this.audio.play('shatter');
+          this.audio.play(positive ? 'gate_pos' : 'gate_neg');
+
+          // Shatter burst — sparkle (additive star) flying out in the gate's color
+          const burstColor = positive ? [0x9ce86b, 0xfff09e, 0xb6f3ff] : [0xff8079, 0xffaaaa, 0xfff5e0];
+          this.particles.emit(
+            new THREE.Vector3(g.x, g.y + g.height * 0.55, g.z),
+            22,
+            { kind: 'sparkle', color: burstColor, size: 14, sizeEnd: 0, speed: 7, gravity: -8, lifetime: 0.6, upBias: 0.5, spread: 1.2 }
+          );
+
+          // Camera shake — felt impact when the panel breaks
+          this.shakeCamera(positive ? 0.16 : 0.12);
+
+          // Floating "+10" / "x3" / "-2" / "÷2" indicator above bear
+          const sym = { add: '+', subtract: '-', multiply: '×', divide: '÷' }[g.op] || '';
+          this._showFloatingChange(`${sym}${g.value}`, positive);
+        }
+      }
       // Goal check
       if (this.player.position.z >= this.level.goalZ - 0.2) {
         this._triggerWin();
       }
+    }
+
+    // Decay camera shake every frame regardless of state
+    if (this._shake && this._shake.intensity > 0) {
+      this._shake.intensity = Math.max(0, this._shake.intensity - this._shake.decay * dt);
     }
 
     if (this.state === STATE.WIN) {
@@ -212,6 +283,7 @@ export class Game {
     }
 
     this._followCamera(dt);
+    this.particles.update(dt);
   }
 
   _triggerWin() {
@@ -220,6 +292,20 @@ export class Game {
     this.player.enableInput(false);
     this.player.setAnimation('idle');
     this.audio.play('win');
+
+    // Win celebration — confetti chips falling + a sparkle bloom on top
+    const goalPos = new THREE.Vector3(0, this.player.position.y + 1, this.level.goalZ);
+    this.particles.emit(goalPos, 50, {
+      kind: 'confetti',
+      color: [0xffd966, 0xff8a4f, 0x9ce86b, 0x6fb9ff, 0xff6fb3, 0xffffff],
+      size: 22, sizeEnd: 16, speed: 8, gravity: -7, lifetime: 1.2, upBias: 0.6, spread: 1.3,
+    });
+    this.particles.emit(goalPos, 18, {
+      kind: 'sparkle',
+      color: [0xfff09e, 0xffffff, 0xb6f3ff],
+      size: 14, sizeEnd: 0, speed: 6, gravity: -5, lifetime: 0.6, upBias: 0.5, spread: 1.0,
+    });
+    this.shakeCamera(0.18);
   }
 
   _triggerFail(reason = 'fall') {
@@ -235,6 +321,14 @@ export class Game {
     this._failStatic = reason === 'wall';
     this._fallVy = -1.5;
     this._fallVx = 0;
+
+    // Dust/debris burst + camera shake (normal blend so it doesn't glow)
+    this.particles.emit(
+      new THREE.Vector3(this.player.position.x, this.player.position.y + 0.3, this.player.position.z),
+      14,
+      { kind: 'dust', color: [0xc8b48a, 0x9c8665, 0xe6d4ad], size: 18, sizeEnd: 0, speed: 3, gravity: -4, lifetime: 0.7, upBias: 0.5, spread: 1.0 }
+    );
+    this.shakeCamera(0.35, 5);
   }
 
   _followCamera(dt) {
@@ -244,6 +338,14 @@ export class Game {
       this.player.position.z + CONFIG.cameraOffset.z
     );
     this.camera.position.lerp(tgt, CONFIG.cameraLerp);
+
+    // Apply camera shake (small random offset based on intensity).
+    if (this._shake.intensity > 0) {
+      const i = this._shake.intensity;
+      this.camera.position.x += (Math.random() - 0.5) * i * 2;
+      this.camera.position.y += (Math.random() - 0.5) * i * 2;
+    }
+
     this.camera.lookAt(
       this.player.position.x * 0.5,
       this.player.position.y + 0.8,

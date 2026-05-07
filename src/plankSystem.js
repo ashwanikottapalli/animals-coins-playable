@@ -12,6 +12,9 @@ export class PlankSystem {
 
     this.count = CONFIG.plankInitialCount;
     this.onCountChange = null;
+    // Optional callbacks (game.js sets these to emit particles).
+    this.onBridgePlank = null;   // (worldPos) =>
+    this.onWallRung = null;      // (worldPos) =>
 
     this._sharedGeo = new THREE.BoxGeometry(
       CONFIG.plankSize.x, CONFIG.plankSize.y, CONFIG.plankSize.z
@@ -131,6 +134,7 @@ export class PlankSystem {
         this.scene.add(plank);
         gap.planksDropped.push(plank);
         this.spend(1);
+        if (this.onBridgePlank) this.onBridgePlank(plank.position);
       }
 
       if (gap.planksDropped.length >= stepCount) gap.bridged = true;
@@ -179,6 +183,7 @@ export class PlankSystem {
     this.scene.add(plank);
     wall.planksStacked[idx] = plank;
     this.spend(1);
+    if (this.onWallRung) this.onWallRung(plank.position);
   }
 
   // Compute the appropriate ground Y for the player at his current z position.

@@ -1,13 +1,151 @@
-// Stubbed for Phase 1. Phase 5 will load real assets via Web Audio.
-// API kept stable so callers can wire in now without changes later.
+// Lightweight Web Audio engine. Plays procedurally-generated sound effects
+// (sine/square/sawtooth oscillators + noise + envelopes). Zero asset cost.
+//
+// Usage:
+//   const a = new Audio();
+//   // ...on first user gesture:
+//   a.unlock();
+//   a.play('pickup');         // 'pickup' | 'gate_pos' | 'gate_neg'
+//                             // 'thud' | 'win' | 'fail' | 'shatter'
+//
+// To swap in real sound files later, set CONFIG.audio.files = { name: 'url' }
+// and the play() call will prefer the file when available (todo for later).
 
 export class Audio {
   constructor() {
+    this.ctx = null;
+    this.master = null;
     this.unlocked = false;
     this.muted = false;
   }
-  unlock() { this.unlocked = true; }
-  play(_name) { /* no-op until Phase 5 */ }
-  startMusic() { /* no-op */ }
-  stopMusic() { /* no-op */ }
+
+  unlock() {
+    if (this.unlocked) return;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { console.warn('[audio] Web Audio API not available'); return; }
+    this.ctx = new Ctx();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0.5;
+    this.master.connect(this.ctx.destination);
+    // Some browsers create context in 'suspended' state — explicitly resume.
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    // iOS Safari: nudge with a 1-sample silent buffer to truly unlock.
+    const buf = this.ctx.createBuffer(1, 1, 22050);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(this.ctx.destination);
+    src.start(0);
+    this.unlocked = true;
+  }
+
+  play(name) {
+    if (!this.unlocked || this.muted || !this.ctx) return;
+    switch (name) {
+      case 'pickup':   return this._pickup();
+      case 'gate_pos': return this._gatePos();
+      case 'gate_neg': return this._gateNeg();
+      case 'thud':     return this._thud();
+      case 'win':      return this._win();
+      case 'fail':     return this._fail();
+      case 'shatter':  return this._shatter();
+    }
+  }
+
+  // ---------- Stubs for future bg music (left as no-ops) ----------
+  startMusic() { /* no-op for now */ }
+  stopMusic()  { /* no-op for now */ }
+
+  // ---------- Sound primitives ----------
+
+  // Schedule a tone at offset seconds from "now".
+  _tone({ freq, type = 'sine', attack = 0.005, decay = 0.12, gain = 0.3, offset = 0, freqEnd = null }) {
+    const t = this.ctx.currentTime + offset;
+    const osc = this.ctx.createOscillator();
+    const env = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (freqEnd != null) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t + attack + decay);
+    }
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(gain, t + attack);
+    env.gain.exponentialRampToValueAtTime(0.0008, t + attack + decay);
+    osc.connect(env).connect(this.master);
+    osc.start(t);
+    osc.stop(t + attack + decay + 0.05);
+  }
+
+  // Filtered noise burst — wood thud, dust, debris.
+  _noise({ duration = 0.08, gain = 0.4, lowpass = 800, highpass = 0, offset = 0 }) {
+    const t = this.ctx.currentTime + offset;
+    const buf = this.ctx.createBuffer(1, Math.max(1, this.ctx.sampleRate * duration), this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    let node = src;
+    if (highpass > 0) {
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'highpass';
+      f.frequency.value = highpass;
+      node.connect(f); node = f;
+    }
+    if (lowpass > 0) {
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = lowpass;
+      node.connect(f); node = f;
+    }
+    const env = this.ctx.createGain();
+    env.gain.setValueAtTime(gain, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    node.connect(env).connect(this.master);
+    src.start(t);
+    src.stop(t + duration + 0.02);
+  }
+
+  // ---------- Sound recipes ----------
+
+  _pickup() {
+    this._tone({ freq: 1320, type: 'triangle', decay: 0.10, gain: 0.18 });
+    this._tone({ freq: 1980, type: 'sine',     decay: 0.08, gain: 0.10, offset: 0.015 });
+  }
+
+  _gatePos() {
+    // Two-note ascending major third
+    this._tone({ freq: 660, type: 'sine', decay: 0.10, gain: 0.22 });
+    this._tone({ freq: 990, type: 'sine', decay: 0.16, gain: 0.22, offset: 0.10 });
+  }
+
+  _gateNeg() {
+    // Two-note descending, slightly harsher waveform
+    this._tone({ freq: 520, type: 'square', decay: 0.10, gain: 0.18 });
+    this._tone({ freq: 360, type: 'square', decay: 0.18, gain: 0.18, offset: 0.10 });
+  }
+
+  _thud() {
+    // Wood-on-wood: short low-passed noise + tiny low-frequency tone for body
+    this._noise({ duration: 0.08, gain: 0.30, lowpass: 600 });
+    this._tone({ freq: 220, type: 'sine', decay: 0.10, gain: 0.10 });
+  }
+
+  _shatter() {
+    // High-pitched noise burst with bandpass for "glass break" feel
+    this._noise({ duration: 0.12, gain: 0.22, lowpass: 6000, highpass: 1200 });
+  }
+
+  _win() {
+    // Three ascending notes: C5 → E5 → G5 (major arpeggio)
+    this._tone({ freq: 523, type: 'sine', decay: 0.18, gain: 0.28, offset: 0.00 });
+    this._tone({ freq: 659, type: 'sine', decay: 0.18, gain: 0.28, offset: 0.12 });
+    this._tone({ freq: 784, type: 'sine', decay: 0.30, gain: 0.30, offset: 0.24 });
+    // sparkle on top
+    this._tone({ freq: 1568, type: 'triangle', decay: 0.30, gain: 0.10, offset: 0.30 });
+  }
+
+  _fail() {
+    // Descending sad — slight frequency slide for that "trombone wah-wah" feel
+    this._tone({ freq: 523, type: 'sawtooth', decay: 0.20, gain: 0.18, offset: 0.00, freqEnd: 392 });
+    this._tone({ freq: 392, type: 'sawtooth', decay: 0.30, gain: 0.18, offset: 0.18, freqEnd: 261 });
+  }
 }
