@@ -134,6 +134,34 @@ export const CONFIG = {
       intro_voice: 'assets/audio/voice_intro.mp3',
       end_voice:   'assets/audio/voice_end.mp3',
     },
+    space: {
+      backdrop:    'assets/themes/space/backdrop.jpg',
+      plank:       'assets/themes/space/plank.jpg',
+      path:        'assets/themes/space/path.jpg',
+      intro_voice: 'assets/themes/space/voice_intro.mp3',
+      end_voice:   'assets/audio/voice_end.mp3',
+    },
+    desert: {
+      backdrop:    'assets/themes/desert/backdrop.jpg',
+      plank:       'assets/themes/desert/plank.jpg',
+      path:        'assets/themes/desert/path.jpg',
+      intro_voice: 'assets/themes/desert/voice_intro.mp3',
+      end_voice:   'assets/audio/voice_end.mp3',
+    },
+    ice: {
+      backdrop:    'assets/themes/ice/backdrop.jpg',
+      plank:       'assets/themes/ice/plank.jpg',
+      path:        'assets/themes/ice/path.jpg',
+      intro_voice: 'assets/themes/ice/voice_intro.mp3',
+      end_voice:   'assets/audio/voice_end.mp3',
+    },
+    city: {
+      backdrop:    'assets/themes/city/backdrop.jpg',
+      plank:       'assets/themes/city/plank.jpg',
+      path:        'assets/themes/city/path.jpg',
+      intro_voice: 'assets/themes/city/voice_intro.mp3',
+      end_voice:   'assets/audio/voice_end.mp3',
+    },
     // Example: drop a new theme by adding files and an entry here.
     // ice: {
     //   backdrop:    'assets/themes/ice/backdrop.jpg',
