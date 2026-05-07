@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Claude Code local settings
+.claude/
+
+# Logs
+*.log
+/tmp/
+build/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local server cache (if any tooling adds it later)
+node_modules/
+.cache/
+dist/
+
+# OS junk
+Thumbs.db
+ehthumbs.db
