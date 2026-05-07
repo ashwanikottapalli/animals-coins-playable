@@ -47,7 +47,12 @@ export function buildLevel(scene) {
         slabTex.repeat.set(w / TILE, length / TILE);
         const slabMat = pathMat.clone();
         slabMat.map = slabTex;
-        slabMat.color.setHex(0xc8c8c4);
+        // White tint = render texture at its full painted brightness; lighting
+        // still modulates it via Lambert. Tinting < white was double-darkening.
+        slabMat.color.setHex(0xffffff);
+        // Lift the dark edges of the slab geometry that don't get direct sun.
+        slabMat.emissive.setHex(0x303030);
+        slabMat.emissiveIntensity = 1.0;
         mesh.material = slabMat;
       }
       console.info(`[level] path texture loaded from ${pathUrl} — applied to ${pathSlabs.length} slabs`);
