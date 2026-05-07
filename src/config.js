@@ -5,6 +5,7 @@ export const CONFIG = {
   pathWidth: 4.0,
   pathHeight: 0.6,
   pathColor: 0x2a2e33,    // very dark slate — unmistakably dark even after Lambert × hemi/ambient
+  preLevelPathLength: 4,  // runway behind the bear at game start (set 0 to disable)
 
   // Player
   playerSpeed: 4.0,           // forward (z) units/sec

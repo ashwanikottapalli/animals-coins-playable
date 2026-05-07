@@ -22,19 +22,24 @@ export class PlankSystem {
       metalness: 0.0,
     }));
 
-    // Try to apply plank.png to the shared material (used by bridge planks,
-    // wall rungs, and the back-stack on the bear).
-    fetch('assets/textures/plank.png', { method: 'HEAD' }).then(res => {
-      if (!res.ok) return;
-      new THREE.TextureLoader().load('assets/textures/plank.png', (tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.anisotropy = 8;
-        this._sharedMat.map = tex;
-        this._sharedMat.color.setHex(0xffffff);
-        this._sharedMat.needsUpdate = true;
-        console.info('[plankSystem] plank texture applied to shared material');
-      });
-    }).catch(() => {});
+    // Try to apply plank texture (jpg first, then png) to the shared material
+    // (used by bridge planks, wall rungs, and the back-stack on the bear).
+    (async () => {
+      for (const url of ['assets/textures/plank.jpg', 'assets/textures/plank.png']) {
+        try {
+          const r = await fetch(url, { method: 'HEAD' });
+          if (!r.ok) continue;
+          const tex = await new THREE.TextureLoader().loadAsync(url);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = 8;
+          this._sharedMat.map = tex;
+          this._sharedMat.color.setHex(0xffffff);
+          this._sharedMat.needsUpdate = true;
+          console.info('[plankSystem] plank texture applied:', url);
+          return;
+        } catch {}
+      }
+    })();
 
     // back-stack visual on bear
     this._backStack = []; // meshes parented to player.backStackAnchor
@@ -52,11 +57,16 @@ export class PlankSystem {
 
   _rebuildBackStack() {
     const anchor = this.player.backStackAnchor;
-    // Resize stack count visually with cap to avoid mesh explosion
     const visible = Math.min(this.count, 30);
     while (this._backStack.length < visible) {
       const m = new THREE.Mesh(this._sharedGeo, this._sharedMat);
       m.castShadow = true;
+      // Tiny per-plank tilt + lateral wobble so the stack reads as individual
+      // planks instead of one solid block. Stored once on creation so it's
+      // consistent across rebuilds.
+      m.userData.tiltZ = (Math.random() - 0.5) * 0.06;
+      m.userData.tiltY = (Math.random() - 0.5) * 0.05;
+      m.userData.shiftX = (Math.random() - 0.5) * 0.04;
       anchor.add(m);
       this._backStack.push(m);
     }
@@ -64,10 +74,13 @@ export class PlankSystem {
       const m = this._backStack.pop();
       anchor.remove(m);
     }
-    // Stack flat planks vertically on bear's back (long axis across back).
+    // Stack flat planks vertically with a small gap so plank edges are visible.
+    const STRIDE = CONFIG.plankSize.y + 0.025;
     for (let i = 0; i < this._backStack.length; i++) {
       const m = this._backStack[i];
-      m.position.set(0, (i + 0.5) * CONFIG.plankSize.y, -0.05);
+      m.position.set(m.userData.shiftX, (i + 0.5) * STRIDE, -0.05);
+      m.rotation.z = m.userData.tiltZ;
+      m.rotation.y = m.userData.tiltY;
     }
   }
 

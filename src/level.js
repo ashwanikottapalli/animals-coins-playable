@@ -29,8 +29,8 @@ export function buildLevel(scene) {
   // consistent regardless of slab length.
   const pathSlabs = []; // tracks { mesh, w, length } for retroactive texturing
   const pathTextureCandidates = [
-    'assets/textures/path.png',
     'assets/textures/path.jpg',
+    'assets/textures/path.png',
   ];
   (async () => {
     for (const url of pathTextureCandidates) {
@@ -66,6 +66,19 @@ export function buildLevel(scene) {
   const root = new THREE.Group();
   root.name = 'levelRoot';
   scene.add(root);
+
+  // Pre-level intro path — runs from -INTRO_LEN to 0 so the bear (which
+  // spawns at z=0) has visible path behind him at game start.
+  const INTRO_LEN = CONFIG.preLevelPathLength ?? 4;
+  if (INTRO_LEN > 0) {
+    const introSlab = createPathSlab(pathMat, CONFIG.pathWidth, CONFIG.pathHeight, INTRO_LEN);
+    introSlab.position.set(0, currentY - CONFIG.pathHeight / 2, -INTRO_LEN / 2);
+    introSlab.receiveShadow = true;
+    root.add(introSlab);
+    pathSlabs.push({ mesh: introSlab, w: CONFIG.pathWidth, length: INTRO_LEN });
+    segments.push({ type: 'path', zStart: -INTRO_LEN, zEnd: 0, y: currentY });
+    // cursorZ stays at 0 — main level builds forward from here as before.
+  }
 
   // Combine consecutive gates into a single z slice (visually they are
   // door-pairs side-by-side). We pre-scan and group by index pairs.
@@ -204,18 +217,23 @@ function getPickupMaterial() {
     roughness: 0.92,
     metalness: 0.0,
   }));
-  // Try to load plank.png and apply
-  fetch('assets/textures/plank.png', { method: 'HEAD' }).then(res => {
-    if (!res.ok) return;
-    new THREE.TextureLoader().load('assets/textures/plank.png', (tex) => {
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 8;
-      _pickupMat.map = tex;
-      _pickupMat.color.setHex(0xffffff);
-      _pickupMat.needsUpdate = true;
-      console.info('[level] plank texture loaded for pickups');
-    });
-  }).catch(() => {});
+  // Try to load plank texture (jpg first, then png) and apply.
+  (async () => {
+    for (const url of ['assets/textures/plank.jpg', 'assets/textures/plank.png']) {
+      try {
+        const r = await fetch(url, { method: 'HEAD' });
+        if (!r.ok) continue;
+        const tex = await new THREE.TextureLoader().loadAsync(url);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 8;
+        _pickupMat.map = tex;
+        _pickupMat.color.setHex(0xffffff);
+        _pickupMat.needsUpdate = true;
+        console.info('[level] plank texture loaded for pickups:', url);
+        return;
+      } catch {}
+    }
+  })();
   return _pickupMat;
 }
 
