@@ -36,16 +36,31 @@ export class Game {
     this.plankSystem.onCountChange = (n) => this.ui.setPlankCount(n);
     this.ui.setPlankCount(this.plankSystem.count);
 
-    this.ui.bindStart(() => this.start());
     this.ui.bindRetry(() => this.reset());
+
+    // No tap-to-play splash anymore; jump straight into the tutorial state.
+    this.start();
   }
 
   start() {
     this.state = STATE.PLAYING;
     this.player.enableInput(true);
-    this.player.setAnimation('run');
+
+    // Show "Drag to Move" tutorial — bear stands idle until the first drag.
+    this.player.tutorialPaused = true;
+    this.player.setAnimation('idle');
+    this.ui.showTutorial();
+    this.player.onMoveStart = () => this._dismissTutorial();
+
     this.audio.unlock();
     this.audio.startMusic();
+  }
+
+  _dismissTutorial() {
+    if (!this.player.tutorialPaused) return;
+    this.player.tutorialPaused = false;
+    this.ui.hideTutorial();
+    this.player.setAnimation('run');
   }
 
   reset() {
@@ -62,7 +77,10 @@ export class Game {
     const playing = this.state === STATE.PLAYING;
     this.player.update(dt, playing);
 
-    if (playing) {
+    if (playing && this.player.tutorialPaused) {
+      // Tutorial showing — bear stands idle, no gameplay logic.
+      this.player.setAnimation('idle');
+    } else if (playing) {
 
       // Pickups
       this.plankSystem.pickupCheck();

@@ -2,9 +2,9 @@ import { CONFIG } from './config.js';
 
 export class UI {
   constructor() {
-    this.intro     = document.getElementById('intro');
     this.cta       = document.getElementById('cta');
     this.fail      = document.getElementById('fail');
+    this.tutorial  = document.getElementById('tutorial');
     this.countEl   = document.getElementById('plankCount');
     this.titleEl   = document.getElementById('ctaTitle');
     this.playBtn   = document.getElementById('playBtn');
@@ -16,16 +16,6 @@ export class UI {
       const url = isIOS() ? CONFIG.branding.storeUrlIOS : CONFIG.branding.storeUrlAndroid;
       try { window.open(url, '_blank'); } catch {}
     });
-  }
-
-  bindStart(handler) {
-    const fire = (e) => {
-      e.preventDefault();
-      this.intro.style.opacity = '0';
-      setTimeout(() => { this.intro.style.display = 'none'; }, 400);
-      handler();
-    };
-    this.intro.addEventListener('pointerdown', fire, { once: true });
   }
 
   bindRetry(handler) {
@@ -47,6 +37,9 @@ export class UI {
   showCTA() { this.cta.classList.add('show'); }
   showFail() { this.fail.classList.add('show'); }
   hideFail() { this.fail.classList.remove('show'); }
+
+  showTutorial() { this.tutorial.classList.remove('hidden'); }
+  hideTutorial() { this.tutorial.classList.add('hidden'); }
 }
 
 function isIOS() {

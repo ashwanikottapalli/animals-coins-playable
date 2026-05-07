@@ -41,6 +41,8 @@ export class Player {
     this.targetX = 0;
     this.alive = true;
     this.climbing = false;        // when true, forward auto-run is paused (climb in place)
+    this.tutorialPaused = false;  // when true, forward auto-run is paused (intro tutorial)
+    this.onMoveStart = null;      // optional callback fired the first time the user drags or presses A/D
 
     // Drag/keyboard input
     this._lastPointerX = null;
@@ -337,6 +339,7 @@ export class Player {
       const x = getPointerX(e);
       const dx = x - this._lastPointerX;
       this._lastPointerX = x;
+      if (dx !== 0) this._fireMoveStart();
       this.targetX -= dx * CONFIG.dragSensitivity;
       this._clampTargetX();
     };
@@ -348,8 +351,8 @@ export class Player {
     window.addEventListener('pointercancel', onUp, { passive: false });
 
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyA' || e.code === 'ArrowLeft')  this._keyLeft = true;
-      if (e.code === 'KeyD' || e.code === 'ArrowRight') this._keyRight = true;
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft')  { this._keyLeft = true;  this._fireMoveStart(); }
+      if (e.code === 'KeyD' || e.code === 'ArrowRight') { this._keyRight = true; this._fireMoveStart(); }
       // Debug pace controls
       if (e.code === 'BracketLeft')  { CONFIG.debugSpeedScale = Math.max(0.05, CONFIG.debugSpeedScale * 0.5); console.log('[debug] speedScale =', CONFIG.debugSpeedScale.toFixed(3)); }
       if (e.code === 'BracketRight') { CONFIG.debugSpeedScale = Math.min(8,    CONFIG.debugSpeedScale * 2.0); console.log('[debug] speedScale =', CONFIG.debugSpeedScale.toFixed(3)); }
@@ -368,6 +371,14 @@ export class Player {
 
   enableInput(enabled) { this._inputEnabled = enabled; }
 
+  _fireMoveStart() {
+    if (this.onMoveStart) {
+      const cb = this.onMoveStart;
+      this.onMoveStart = null;   // fire once
+      cb();
+    }
+  }
+
   // Flip the bear's yaw so it faces a different direction.
   // Applied to facingNode (which sits between pivot and bear) so we get a
   // clean world-Y rotation independent of the bear's own X-axis correction.
@@ -385,7 +396,7 @@ export class Player {
     if (!isRunning || !this.alive) return;
 
     const scale = CONFIG.debugSpeedScale ?? 1;
-    if (!this.climbing) {
+    if (!this.climbing && !this.tutorialPaused) {
       this.position.z += CONFIG.playerSpeed * scale * dt;
     }
 

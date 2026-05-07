@@ -9,14 +9,27 @@
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     width: 100%; height: 100%; overflow: hidden;
-    background: #0b1f17;
+    background: #000;        /* letterbox bars on landscape viewports */
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: #fff;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
   }
-  #app { position: fixed; inset: 0; }
+  /* Force a 9:16 portrait playable area, regardless of viewport. */
+  /* On mobile portrait the box fills the screen; on desktop / mobile  */
+  /* landscape it sits centered with dark bars on the sides.            */
+  #app {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    aspect-ratio: 9 / 16;
+    width:  min(100vw, calc(100vh * 9 / 16));
+    height: min(100vh, calc(100vw * 16 / 9));
+    overflow: hidden;
+    background: #0b1f17;
+  }
   #gameCanvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
   /* HUD: plank counter */
@@ -42,32 +55,6 @@
     transform: rotate(-12deg);
   }
 
-  /* Intro overlay */
-  #intro {
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.75) 100%);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    z-index: 10;
-    cursor: pointer;
-    transition: opacity 0.4s ease;
-  }
-  #intro h1 { font-size: 44px; letter-spacing: 1px; margin-bottom: 12px; text-align: center; }
-  #intro p {
-    font-size: 22px; opacity: 0.9; margin-bottom: 32px; text-align: center;
-    animation: pulse 1.4s ease-in-out infinite;
-  }
-  #intro .tap-icon {
-    width: 80px; height: 80px; border-radius: 50%;
-    background: rgba(255,255,255,0.18);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 38px;
-    animation: tapPulse 1.2s ease-in-out infinite;
-  }
-  @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
-  @keyframes tapPulse {
-    0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.35); }
-    50%     { transform: scale(1.08); box-shadow: 0 0 0 18px rgba(255,255,255,0); }
-  }
 
   /* CTA overlay */
   #cta {
@@ -96,6 +83,72 @@
     50%     { transform: scale(1.05); }
   }
 
+  /* Tutorial overlay — shown after Tap-to-Play, dismisses on first drag */
+  #tutorial {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 8;
+    transition: opacity 0.4s ease;
+  }
+  #tutorial.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
+
+  /* Goal-hint cloud bubble — positioned just above-right of bear's head.
+     transform-origin near the bottom-left makes the pulse "anchor" toward
+     the bear, reinforcing the thought-bubble feel. */
+  #tutorialBubble {
+    position: absolute;
+    top: 46%;
+    left: 58%;
+    width: 170px;
+    height: auto;
+    transform-origin: 22% 88%;
+    animation: bubblePulse 1.4s ease-in-out infinite;
+    filter: drop-shadow(0 8px 14px rgba(0,0,0,0.22));
+  }
+  @keyframes bubblePulse {
+    0%,100% { transform: scale(1); }
+    50%     { transform: scale(1.08); }
+  }
+
+  /* Static "Drag to Move + arrow" image — sits low on screen, out of gameplay area. */
+  #tutorialArrow {
+    position: absolute;
+    bottom: 7%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70%;
+    max-width: 520px;
+    height: auto;
+    filter: drop-shadow(0 6px 0 rgba(0,0,0,0.20));
+  }
+
+  /* Finger: placed as a zero-width anchor at horizontal center, then the inner
+     img is shifted left by -50% of its own width to center it. Animation runs
+     on the img's transform so it doesn't fight the centering. */
+  #tutorial { container-type: inline-size; }
+  #tutorialFingerWrap {
+    position: absolute;
+    bottom: 1%;
+    left: 50%;
+    width: 0;          /* zero-width anchor — children center via translateX(-50%) below */
+    pointer-events: none;
+  }
+  #tutorialFinger {
+    display: block;
+    width: 170px;
+    height: auto;
+    margin-top: -50px;
+    /* anim moves it ±32% of the playable area; the (-50%) keeps it centered over the anchor */
+    animation: fingerSwipe 1.6s ease-in-out infinite;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.30));
+  }
+  /* Asymmetric — left tip clipped slightly so finger doesn't overflow past the
+     arrow's left edge while keeping the full right reach. */
+  @keyframes fingerSwipe {
+    0%,100% { transform: translateX(calc(-50% - 26cqw)); }
+    50%     { transform: translateX(calc(-50% + 32cqw)); }
+  }
+
   /* Fail/result overlay (Phase 1: simple) */
   #fail {
     position: absolute; inset: 0;
@@ -121,10 +174,12 @@
       <span id="plankIcon"></span>
     </div>
 
-    <div id="intro">
-      <h1>Animals &amp; Coins</h1>
-      <p>Tap to Play</p>
-      <div class="tap-icon">👆</div>
+    <div id="tutorial" class="hidden">
+      <img id="tutorialBubble" src="assets/textures/cloud_bubble.png" alt="">
+      <img id="tutorialArrow"  src="assets/textures/arrow.png"        alt="">
+      <div id="tutorialFingerWrap">
+        <img id="tutorialFinger" src="assets/textures/finger.png" alt="">
+      </div>
     </div>
 
     <div id="fail">

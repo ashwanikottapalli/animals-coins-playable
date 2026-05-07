@@ -15,12 +15,20 @@ console.info('%c[boot] config snapshot', 'color:#0aa', {
   toonEnabled: CONFIG.toon.enabled,
 });
 
+const appEl  = document.getElementById('app');
 const canvas = document.getElementById('gameCanvas');
+
+// Read the playable container's size — NOT window — because the page
+// letterboxes the playable to 9:16 portrait on desktop.
+const getViewSize = () => ({ w: appEl.clientWidth, h: appEl.clientHeight });
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
 const PIXEL_RATIO = Math.min(window.devicePixelRatio, 2);
 renderer.setPixelRatio(PIXEL_RATIO);
-renderer.setSize(window.innerWidth, window.innerHeight, false);
+{
+  const { w, h } = getViewSize();
+  renderer.setSize(w, h, false);
+}
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -32,7 +40,7 @@ scene.fog = new THREE.Fog(0xc7e0d2, 35, 95);
 
 const camera = new THREE.PerspectiveCamera(
   55,
-  window.innerWidth / window.innerHeight,
+  (() => { const { w, h } = getViewSize(); return w / h; })(),
   0.1,
   200
 );
@@ -184,12 +192,15 @@ scene.add(ambient);
 
 const composer = new EffectComposer(renderer);
 composer.setPixelRatio(PIXEL_RATIO);
-composer.setSize(window.innerWidth, window.innerHeight);
+{
+  const { w, h } = getViewSize();
+  composer.setSize(w, h);
+}
 
 composer.addPass(new RenderPass(scene, camera));
 
 const bloom = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  new THREE.Vector2(...Object.values(getViewSize())),
   CONFIG.fx.bloomStrength,
   CONFIG.fx.bloomRadius,
   CONFIG.fx.bloomThreshold,
@@ -198,9 +209,10 @@ composer.addPass(bloom);
 
 const fxaa = new ShaderPass(FXAAShader);
 const setFxaaResolution = () => {
+  const { w, h } = getViewSize();
   fxaa.uniforms.resolution.value.set(
-    1 / (window.innerWidth  * PIXEL_RATIO),
-    1 / (window.innerHeight * PIXEL_RATIO),
+    1 / (w * PIXEL_RATIO),
+    1 / (h * PIXEL_RATIO),
   );
 };
 setFxaaResolution();
@@ -208,14 +220,18 @@ composer.addPass(fxaa);
 
 // ------------------------------------------------------------------
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+function applyViewSize() {
+  const { w, h } = getViewSize();
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
-  composer.setSize(window.innerWidth, window.innerHeight);
-  bloom.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(w, h, false);
+  composer.setSize(w, h);
+  bloom.setSize(w, h);
   setFxaaResolution();
-});
+}
+window.addEventListener('resize', applyViewSize);
+// Also react if something resizes the #app element itself (e.g., devtools open).
+new ResizeObserver(applyViewSize).observe(appEl);
 
 const game = new Game({ scene, camera, renderer, canvas });
 game.init();

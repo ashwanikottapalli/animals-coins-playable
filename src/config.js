@@ -27,10 +27,13 @@ export const CONFIG = {
   gateHeight: 2.6,
   gateThickness: 0.16,
   gateColors: {
-    add:      [0xff7a3a, 0xc9412a],   // orange/red
-    subtract: [0xa84cff, 0xc7274d],   // purple/red
-    multiply: [0xffb030, 0xff5a30],   // yellow/orange
-    divide:   [0x32d6c5, 0x2a8c9a],   // teal
+    // Lifted toward pastel — same hues, ~25% lerp toward white for a softer
+    // reference-style gradient feel (matches the lighter look of typical
+    // playable-ad math gates).
+    add:      [0xff9b6b, 0xd7715f],   // soft coral → warm peach
+    subtract: [0xbe79ff, 0xd55d7a],   // light orchid → muted magenta
+    multiply: [0xffc464, 0xff8364],   // soft yellow-orange → coral
+    divide:   [0x65e0d4, 0x5fa9b3],   // light teal → muted aqua
   },
 
   // Camera — closer 3/4 hero shot like classic playable ads
