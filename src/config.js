@@ -117,6 +117,34 @@ export const CONFIG = {
     bloomThreshold:0.78,      // only pixels brighter than this contribute (lower = more areas glow)
   },
 
+  // ------------------------------------------------------------------
+  // Theme system. Switch via URL: index.html?theme=ice
+  // Each theme defines paths for the three swappable textures:
+  //   backdrop = the distant jungle/sky card behind the level
+  //   plank    = the texture used for ALL plank meshes (pickups, bridge, rungs, back-stack)
+  //   path     = the runway / wall slab texture
+  // The path strings can point anywhere — keep all in assets/textures/ for the
+  // default theme, or organize per-theme folders under assets/themes/<name>/.
+  // ------------------------------------------------------------------
+  themes: {
+    jungle: {
+      backdrop:    'assets/textures/backdrop.jpg',
+      plank:       'assets/textures/plank.jpg',
+      path:        'assets/textures/path.jpg',
+      intro_voice: 'assets/audio/voice_intro.mp3',
+      end_voice:   'assets/audio/voice_end.mp3',
+    },
+    // Example: drop a new theme by adding files and an entry here.
+    // ice: {
+    //   backdrop:    'assets/themes/ice/backdrop.jpg',
+    //   plank:       'assets/themes/ice/plank.jpg',
+    //   path:        'assets/themes/ice/path.jpg',
+    //   intro_voice: 'assets/themes/ice/voice_intro.mp3',
+    //   end_voice:   'assets/themes/ice/voice_end.mp3',
+    // },
+  },
+  defaultTheme: 'jungle',
+
   // Branding
   branding: {
     title: 'Animals & Coins',
@@ -127,3 +155,24 @@ export const CONFIG = {
     logoPath: 'assets/textures/icon.jpg',
   },
 };
+
+// Resolve the active theme from the ?theme=... URL query param. Falls back
+// to CONFIG.defaultTheme if the param is missing or unknown. Cached so all
+// loaders see the same theme even if read at different times.
+let _activeTheme = null;
+export function getActiveTheme() {
+  if (_activeTheme) return _activeTheme;
+  let requested = null;
+  if (typeof window !== 'undefined') {
+    requested = new URLSearchParams(window.location.search).get('theme');
+  }
+  if (requested && CONFIG.themes[requested]) {
+    _activeTheme = CONFIG.themes[requested];
+    console.info(`[theme] active: ${requested}`);
+  } else {
+    if (requested) console.warn(`[theme] '${requested}' not found — using default '${CONFIG.defaultTheme}'`);
+    _activeTheme = CONFIG.themes[CONFIG.defaultTheme];
+    console.info(`[theme] active: ${CONFIG.defaultTheme} (default)`);
+  }
+  return _activeTheme;
+}

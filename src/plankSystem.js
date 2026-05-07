@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CONFIG } from './config.js';
+import { CONFIG, getActiveTheme } from './config.js';
 import { toToon } from './toon.js';
 
 // Inventory + bridge + stair + back-stack visualization.
@@ -25,23 +25,22 @@ export class PlankSystem {
       metalness: 0.0,
     }));
 
-    // Try to apply plank texture (jpg first, then png) to the shared material
+    // Try to apply the active-theme plank texture to the shared material
     // (used by bridge planks, wall rungs, and the back-stack on the bear).
     (async () => {
-      for (const url of ['assets/textures/plank.jpg', 'assets/textures/plank.png']) {
-        try {
-          const r = await fetch(url, { method: 'HEAD' });
-          if (!r.ok) continue;
-          const tex = await new THREE.TextureLoader().loadAsync(url);
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = 8;
-          this._sharedMat.map = tex;
-          this._sharedMat.color.setHex(0xffffff);
-          this._sharedMat.needsUpdate = true;
-          console.info('[plankSystem] plank texture applied:', url);
-          return;
-        } catch {}
-      }
+      const url = getActiveTheme().plank;
+      if (!url) return;
+      try {
+        const r = await fetch(url, { method: 'HEAD' });
+        if (!r.ok) return;
+        const tex = await new THREE.TextureLoader().loadAsync(url);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 8;
+        this._sharedMat.map = tex;
+        this._sharedMat.color.setHex(0xffffff);
+        this._sharedMat.needsUpdate = true;
+        console.info('[plankSystem] plank texture applied:', url);
+      } catch {}
     })();
 
     // back-stack visual on bear

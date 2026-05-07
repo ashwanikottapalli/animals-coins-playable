@@ -250,6 +250,9 @@ export class Game {
           const after = applyGateOp(before, g.op, g.value);
           this.plankSystem.setCount(after);
           g.applied = true;
+          // Lock siblings — bear can only collect one panel per gate row,
+          // even if its lateral movement clips the seam between two panels.
+          if (g.siblings) for (const s of g.siblings) s.applied = true;
           g.group.userData._t0 = this._time;
 
           // Shatter the panel — keep the posts standing

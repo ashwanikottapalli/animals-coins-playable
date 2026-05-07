@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Game } from './game.js';
-import { CONFIG } from './config.js';
+import { CONFIG, getActiveTheme } from './config.js';
 import { createSky } from './sky.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
@@ -54,22 +54,15 @@ const sky = createSky({ horizonColor: 0xc7e0d2, zenithColor: 0x6fa6d6 });
 camera.add(sky);
 scene.add(camera);
 
-// Optional stylized backdrop card — a wide plane parented to the camera so
-// it's always behind the action, simulating a distant jungle treeline.
-// Auto-loads from assets/textures/backdrop.{jpg,png} if present.
+// Stylized backdrop card — a wide plane parented to the camera so it's
+// always behind the action. Path comes from the active theme.
 (async () => {
-  const candidates = [
-    'assets/textures/backdrop.jpg',
-    'assets/textures/backdrop.png',
-  ];
-  let url = null;
-  for (const c of candidates) {
-    try {
-      const r = await fetch(c, { method: 'HEAD' });
-      if (r.ok) { url = c; break; }
-    } catch {}
-  }
+  const url = getActiveTheme().backdrop;
   if (!url) return;
+  try {
+    const r = await fetch(url, { method: 'HEAD' });
+    if (!r.ok) return;
+  } catch { return; }
   new THREE.TextureLoader().load(url, (tex) => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;

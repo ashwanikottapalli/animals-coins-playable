@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CONFIG } from './config.js';
+import { CONFIG, getActiveTheme } from './config.js';
 import { createMathGate } from './mathGate.js';
 import { toToon } from './toon.js';
 
@@ -28,39 +28,30 @@ export function buildLevel(scene) {
   // slab to a per-slab clone with size-aware UV repeat so the tile pattern is
   // consistent regardless of slab length.
   const pathSlabs = []; // tracks { mesh, w, length } for retroactive texturing
-  const pathTextureCandidates = [
-    'assets/textures/path.jpg',
-    'assets/textures/path.png',
-  ];
+  const pathUrl = getActiveTheme().path;
   (async () => {
-    for (const url of pathTextureCandidates) {
-      try {
-        const head = await fetch(url, { method: 'HEAD' });
-        if (!head.ok) continue;
-        const tex = await new THREE.TextureLoader().loadAsync(url);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-        tex.anisotropy = 8;
-        const TILE = 1.5; // world units per texture tile
-        for (const { mesh, w, length } of pathSlabs) {
-          const slabTex = tex.clone();
-          slabTex.image = tex.image;
-          slabTex.needsUpdate = true;
-          slabTex.wrapS = slabTex.wrapT = THREE.RepeatWrapping;
-          slabTex.repeat.set(w / TILE, length / TILE);
-          const slabMat = pathMat.clone();
-          slabMat.map = slabTex;
-          // Tint slightly bright so the dark stone texture lifts to a pale,
-          // hero-friendly path (matches the reference look).
-          slabMat.color.setHex(0xc8c8c4);
-          mesh.material = slabMat;
-        }
-        console.info(`[level] path texture loaded from ${url} — applied to ${pathSlabs.length} slabs`);
-        return;
-      } catch (err) {
-        // try next
+    if (!pathUrl) return;
+    try {
+      const head = await fetch(pathUrl, { method: 'HEAD' });
+      if (!head.ok) return;
+      const tex = await new THREE.TextureLoader().loadAsync(pathUrl);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = 8;
+      const TILE = 1.5; // world units per texture tile
+      for (const { mesh, w, length } of pathSlabs) {
+        const slabTex = tex.clone();
+        slabTex.image = tex.image;
+        slabTex.needsUpdate = true;
+        slabTex.wrapS = slabTex.wrapT = THREE.RepeatWrapping;
+        slabTex.repeat.set(w / TILE, length / TILE);
+        const slabMat = pathMat.clone();
+        slabMat.map = slabTex;
+        slabMat.color.setHex(0xc8c8c4);
+        mesh.material = slabMat;
       }
-    }
+      console.info(`[level] path texture loaded from ${pathUrl} — applied to ${pathSlabs.length} slabs`);
+    } catch {}
   })();
 
   const root = new THREE.Group();
@@ -152,12 +143,16 @@ export function buildLevel(scene) {
         i++; // consume next
       }
       const rowZ = cursorZ + 0.5; // small offset into the upcoming path
+      // Each gate in a pair gets a reference to its siblings so we can
+      // mark all gates in the pair as "applied" the moment one fires —
+      // prevents double-fire when the bear straddles the seam between panels.
+      const siblings = [];
       for (const g of pair) {
         const xOffset = g.side === 'left' ? -CONFIG.pathWidth / 4 : CONFIG.pathWidth / 4;
         const gate = createMathGate(g.op, g.value);
         gate.group.position.set(xOffset, currentY + CONFIG.gateHeight / 2, rowZ);
         root.add(gate.group);
-        gates.push({
+        const gateObj = {
           ...gate,
           op: g.op,
           value: g.value,
@@ -167,7 +162,10 @@ export function buildLevel(scene) {
           width: CONFIG.gateWidth,
           height: CONFIG.gateHeight,
           applied: false,
-        });
+          siblings,                // shared array — populated below
+        };
+        siblings.push(gateObj);
+        gates.push(gateObj);
       }
       // Don't advance cursorZ — gates sit on the existing path.
     } else if (seg.type === 'goal') {
@@ -217,22 +215,21 @@ function getPickupMaterial() {
     roughness: 0.92,
     metalness: 0.0,
   }));
-  // Try to load plank texture (jpg first, then png) and apply.
+  // Try to load the active-theme plank texture and apply.
   (async () => {
-    for (const url of ['assets/textures/plank.jpg', 'assets/textures/plank.png']) {
-      try {
-        const r = await fetch(url, { method: 'HEAD' });
-        if (!r.ok) continue;
-        const tex = await new THREE.TextureLoader().loadAsync(url);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.anisotropy = 8;
-        _pickupMat.map = tex;
-        _pickupMat.color.setHex(0xffffff);
-        _pickupMat.needsUpdate = true;
-        console.info('[level] plank texture loaded for pickups:', url);
-        return;
-      } catch {}
-    }
+    const url = getActiveTheme().plank;
+    if (!url) return;
+    try {
+      const r = await fetch(url, { method: 'HEAD' });
+      if (!r.ok) return;
+      const tex = await new THREE.TextureLoader().loadAsync(url);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      _pickupMat.map = tex;
+      _pickupMat.color.setHex(0xffffff);
+      _pickupMat.needsUpdate = true;
+      console.info('[level] plank texture loaded for pickups:', url);
+    } catch {}
   })();
   return _pickupMat;
 }

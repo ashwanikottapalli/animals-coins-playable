@@ -1,15 +1,16 @@
+import { getActiveTheme } from './config.js';
+
 // Lightweight Web Audio engine. Plays procedurally-generated sound effects
-// (sine/square/sawtooth oscillators + noise + envelopes). Zero asset cost.
+// + theme-bound voice files (loaded via fetch, decoded, played as buffers).
 //
 // Usage:
 //   const a = new Audio();
-//   // ...on first user gesture:
-//   a.unlock();
-//   a.play('pickup');         // 'pickup' | 'gate_pos' | 'gate_neg'
-//                             // 'thud' | 'win' | 'fail' | 'shatter'
+//   a.unlock();                  // on first gesture (creates ctx + loads voice)
+//   a.play('voice_intro');       // file-backed
+//   a.play('pickup');            // procedural fallback
 //
-// To swap in real sound files later, set CONFIG.audio.files = { name: 'url' }
-// and the play() call will prefer the file when available (todo for later).
+// File paths come from the active theme, so each theme can ship its own
+// voiceover (e.g. ?theme=ice loads the ice-themed VO).
 
 export class Audio {
   constructor() {
@@ -37,9 +38,10 @@ export class Audio {
       this.ctx.addEventListener('statechange', () => {
         if (this.ctx.state === 'running') this._drainPending();
       });
-      // Auto-load voice files (decodeAudioData works in suspended state).
-      this.loadFile('voice_intro', 'assets/audio/voice_intro.mp3');
-      this.loadFile('voice_end',   'assets/audio/voice_end.mp3');
+      // Auto-load theme-bound voice files (decodeAudioData works in suspended state).
+      const theme = getActiveTheme();
+      if (theme.intro_voice) this.loadFile('voice_intro', theme.intro_voice);
+      if (theme.end_voice)   this.loadFile('voice_end',   theme.end_voice);
     }
 
     if (this.ctx.state === 'suspended') {
