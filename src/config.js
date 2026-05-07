@@ -162,6 +162,13 @@ export const CONFIG = {
       intro_voice: 'assets/themes/city/voice_intro.mp3',
       end_voice:   'assets/audio/voice_end.mp3',
     },
+    voodoo: {
+      backdrop:    'assets/themes/voodoo/backdrop.jpg',
+      plank:       'assets/themes/voodoo/plank.jpg',
+      path:        'assets/themes/voodoo/path.jpg',
+      intro_voice: 'assets/themes/voodoo/voice_intro.mp3',
+      end_voice:   'assets/audio/voice_end.mp3',
+    },
     // Example: drop a new theme by adding files and an entry here.
     // ice: {
     //   backdrop:    'assets/themes/ice/backdrop.jpg',
