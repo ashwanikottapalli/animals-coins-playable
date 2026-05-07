@@ -61,8 +61,17 @@ export class Game {
 
     this.ui.bindRetry(() => this.reset());
 
-    // No tap-to-play splash anymore; jump straight into the tutorial state.
-    this.start();
+    // Wait for bear+animations to load before starting the game and revealing
+    // the tutorial. Until then the loading splash covers the scene.
+    if (this.player._loaded) {
+      this.ui.completeLoading();
+      this.start();
+    } else {
+      this.player.onReady = () => {
+        this.ui.completeLoading();
+        this.start();
+      };
+    }
   }
 
   shakeCamera(intensity = 0.15, decay = 6) {
@@ -100,6 +109,8 @@ export class Game {
     this.player.onMoveStart = () => {
       this.audio.unlock();
       this.audio.startMusic();
+      // Greeting voiceover (queues if file is still loading).
+      this.audio.play('voice_intro');
       this._dismissTutorial();
     };
   }
@@ -262,6 +273,7 @@ export class Game {
       this._endTimer += dt;
       if (this._endTimer > 1.0) {
         this.ui.showCTA();
+        this.audio.play('voice_end');
         this.state = 'cta-shown';
       }
     }
@@ -278,7 +290,8 @@ export class Game {
       const delay = this._failStatic ? 0.7 : 1.1;
       if (this._time - this._fallStart > delay) {
         this._failShown = true;
-        this.ui.showFail();
+        this.ui.showCTA('fail');
+        this.audio.play('voice_end');
       }
     }
 

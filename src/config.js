@@ -88,6 +88,12 @@ export const CONFIG = {
     backStackLocal: { x: 0, y: 0.60, z: -0.32 }, // anchor offset on the bear — scaled with the bear
     crossFadeSec: 0.18,
     rootBone: 'mixamorigHips', // strip this bone's .position track from clips (kills root motion)
+    // Cel-shaded outline (inverted-hull). Set enabled:false to skip.
+    outline: {
+      enabled: true,
+      color: 0x1a1106,
+      thickness: 0.012,   // world units; small because bear is small
+    },
     // GLB embeds textures natively — leave overrides off.
     colorOverride: null,
     emissive: null,
@@ -111,12 +117,13 @@ export const CONFIG = {
     bloomThreshold:0.78,      // only pixels brighter than this contribute (lower = more areas glow)
   },
 
-  // Branding (swap when ready)
+  // Branding
   branding: {
     title: 'Animals & Coins',
     sub: 'Run, collect, and build your way to victory!',
     cta: 'PLAY NOW',
-    storeUrlIOS: '#',
-    storeUrlAndroid: '#',
+    storeUrlIOS:     'https://apps.apple.com/il/app/animals-coins-adventure-game/id1492722342',
+    storeUrlAndroid: 'https://play.google.com/store/apps/details?id=com.innplaylabs.animalkingdomraid&hl=en_IN',
+    logoPath: 'assets/textures/icon.jpg',
   },
 };

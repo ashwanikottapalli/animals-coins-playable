@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <title>Animals &amp; Coins</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     width: 100%; height: 100%; overflow: hidden;
     background: #000;        /* letterbox bars on landscape viewports */
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: #fff;
     touch-action: none;
     user-select: none;
@@ -56,31 +59,157 @@
   }
 
 
-  /* CTA overlay */
+  /* CTA / Win overlay */
   #cta {
     position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.85) 100%);
+    background: linear-gradient(180deg, rgba(20,30,25,0.55) 0%, rgba(0,0,0,0.85) 100%);
+    backdrop-filter: blur(2px);
     display: none; flex-direction: column; align-items: center; justify-content: center;
     z-index: 11;
+    padding: 0 24px;
   }
   #cta.show { display: flex; animation: fadeIn 0.5s ease; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  #cta h2 { font-size: 38px; margin-bottom: 6px; text-align: center; }
-  #cta .sub { font-size: 18px; opacity: 0.9; margin-bottom: 36px; text-align: center; }
+  @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+  #ctaLogo {
+    width: 160px; height: 160px;
+    border-radius: 36px;
+    box-shadow:
+      0 14px 32px rgba(0,0,0,0.45),
+      0 0 0 5px rgba(255,255,255,0.95),
+      inset 0 -4px 0 rgba(0,0,0,0.10);
+    margin-bottom: 22px;
+    object-fit: cover;
+    animation: logoFloat 3s ease-in-out infinite;
+  }
+  @keyframes logoFloat {
+    0%,100% { transform: translateY(0); }
+    50%     { transform: translateY(-6px); }
+  }
+  #cta h2 {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: 50px;
+    color: #ffce3c;
+    -webkit-text-stroke: 5px #2b1a06;
+    paint-order: stroke fill;
+    /* 3D extruded sticker effect */
+    text-shadow:
+      0 5px 0 #b87a16,
+      0 10px 0 #5a3a05,
+      0 16px 20px rgba(0,0,0,0.45);
+    text-align: center;
+    margin-bottom: 14px;
+    letter-spacing: -0.5px;
+    line-height: 1.0;
+  }
+  #cta .sub {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 500;
+    font-size: 17px;
+    opacity: 0.94;
+    margin-bottom: 32px;
+    text-align: center;
+    max-width: 80%;
+    line-height: 1.4;
+    color: #fff;
+  }
   #playBtn {
+    position: relative;
     background: linear-gradient(180deg, #ffcb3a 0%, #f59c1a 100%);
     color: #2a1700;
     border: none; border-radius: 50px;
-    padding: 20px 56px;
-    font-size: 26px; font-weight: 900;
-    letter-spacing: 1px;
+    padding: 22px 60px;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 28px; font-weight: 700;
+    letter-spacing: 0.8px;
     cursor: pointer;
-    box-shadow: 0 10px 24px rgba(245,156,26,0.55), inset 0 -4px 0 rgba(0,0,0,0.18);
-    animation: btnPulse 1.4s ease-in-out infinite;
+    box-shadow:
+      0 10px 28px rgba(245,156,26,0.55),
+      0 0 0 4px rgba(255,255,255,0.95),
+      inset 0 -5px 0 rgba(0,0,0,0.20);
+    animation: btnPulse 1.3s ease-in-out infinite;
+    overflow: hidden;
+  }
+  /* Subtle shine sweep on the play button */
+  #playBtn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+    animation: btnShine 2.4s ease-in-out infinite;
   }
   @keyframes btnPulse {
     0%,100% { transform: scale(1); }
-    50%     { transform: scale(1.05); }
+    50%     { transform: scale(1.06); }
+  }
+  @keyframes btnShine {
+    0%   { left: -100%; }
+    60%  { left: 120%; }
+    100% { left: 120%; }
+  }
+  /* Secondary action under the primary CTA. Hidden by default; shown on fail. */
+  #retryBtn {
+    margin-top: 16px;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.75);
+    font-family: 'Fredoka', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 8px 18px;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    transition: color 0.2s ease;
+    display: none;
+  }
+  #retryBtn:hover { color: #fff; }
+  #cta.fail #retryBtn { display: inline-block; }
+
+  /* Loading splash — shown until all assets are decoded. */
+  #loading {
+    position: absolute; inset: 0;
+    z-index: 12;
+    background: linear-gradient(180deg, #2c4434 0%, #1a2820 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: opacity 0.45s ease;
+  }
+  #loading.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
+  #loading .ld-title {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: 44px;
+    letter-spacing: -0.5px;
+    color: #ffce3c;
+    -webkit-text-stroke: 4px #2b1a06;
+    paint-order: stroke fill;
+    /* Stacked drop shadows = 3D extruded sticker */
+    text-shadow:
+      0 4px 0 #b87a16,
+      0 8px 0 #5a3a05,
+      0 14px 18px rgba(0,0,0,0.40);
+    margin-bottom: 28px;
+    text-align: center;
+    line-height: 1;
+  }
+  #loading .ld-bar {
+    width: 60%; max-width: 320px; height: 14px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 7px;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+  }
+  #loading .ld-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #ffd83a 0%, #ff9b5e 100%);
+    border-radius: 7px;
+    transition: width 0.2s ease-out;
+  }
+  #loading .ld-pct {
+    margin-top: 12px;
+    font-size: 14px; opacity: 0.75;
+    letter-spacing: 1px;
   }
 
   /* Tutorial overlay — shown after Tap-to-Play, dismisses on first drag */
@@ -172,19 +301,6 @@
     100% { opacity: 0; transform: translate(-50%, -130%) scale(1); }
   }
 
-  /* Fail/result overlay (Phase 1: simple) */
-  #fail {
-    position: absolute; inset: 0;
-    background: rgba(0,0,0,0.7);
-    display: none; flex-direction: column; align-items: center; justify-content: center;
-    z-index: 9;
-  }
-  #fail.show { display: flex; }
-  #fail h2 { font-size: 32px; margin-bottom: 18px; }
-  #fail button {
-    background: #fff; color: #111; border: none; border-radius: 40px;
-    padding: 14px 32px; font-size: 18px; font-weight: 800; cursor: pointer;
-  }
 </style>
 </head>
 <body>
@@ -197,6 +313,12 @@
       <span id="plankIcon"></span>
     </div>
 
+    <div id="loading">
+      <div class="ld-title" id="loadingTitle">Animals &amp; Coins</div>
+      <div class="ld-bar"><div class="ld-fill" id="loadingFill"></div></div>
+      <div class="ld-pct" id="loadingPct">0%</div>
+    </div>
+
     <div id="tutorial" class="hidden">
       <img id="tutorialBubble" src="assets/textures/cloud_bubble.png" alt="">
       <img id="tutorialArrow"  src="assets/textures/arrow.png"        alt="">
@@ -205,15 +327,12 @@
       </div>
     </div>
 
-    <div id="fail">
-      <h2>Oops! Try again</h2>
-      <button id="retryBtn">Retry</button>
-    </div>
-
     <div id="cta">
+      <img id="ctaLogo" src="assets/textures/icon.jpg" alt="">
       <h2 id="ctaTitle">Animals &amp; Coins</h2>
-      <p class="sub">Run, collect, and build your way to victory!</p>
+      <p class="sub" id="ctaSub">Run, collect, and build your way to victory!</p>
       <button id="playBtn">PLAY NOW</button>
+      <button id="retryBtn">Try Again</button>
     </div>
   </div>
 

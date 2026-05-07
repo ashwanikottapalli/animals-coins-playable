@@ -58,6 +58,7 @@ export class Player {
     this.currentAction = null;
     this.currentName = null;
     this._loaded = false;
+    this.onReady = null;          // optional callback fired once bear+anims are ready
 
     // Temporary placeholder so the scene isn't empty during load.
     this._placeholder = this._buildPlaceholder();
@@ -168,6 +169,13 @@ export class Player {
 
       // Convert standard materials to toon for cartoon shading.
       applyToonToObject(bear);
+
+      // Cel-shaded outline (inverted hull). Clones the skinned meshes,
+      // pushes their vertices outward along normals via a tiny shader, and
+      // renders them with backface-only + dark color → traces a thin outline.
+      if (CONFIG.bear.outline?.enabled !== false) {
+        addInvertedHullOutline(bear, CONFIG.bear.outline);
+      }
 
       this.mesh = bear;
       this.facingNode.add(bear);
@@ -284,6 +292,8 @@ export class Player {
       console.info('[player] Bear loaded.',
         'scale:', heightScale.toFixed(3),
         'animations:', Object.keys(this.actions));
+
+      if (this.onReady) this.onReady();
     } catch (err) {
       console.error('[player] Failed to load bear FBX:', err);
       console.info('[player] Continuing with placeholder capsule.');
@@ -454,4 +464,67 @@ function makeBlobShadow() {
   mesh.position.y = 0.02;          // just above the foot plane to avoid z-fighting
   mesh.renderOrder = 1;
   return mesh;
+}
+
+// Cel-shaded outline via inverted-hull pass. For each SkinnedMesh in the bear,
+// add a sibling clone that shares the same skeleton, renders BackSide only, and
+// inflates vertices along normals in the vertex shader. Result: a thin solid
+// outline traced around the silhouette.
+function addInvertedHullOutline(root, opts = {}) {
+  const color = opts.color ?? 0x1a1106;
+  const thickness = opts.thickness ?? 0.04;   // world units of outline expansion
+
+  const created = [];
+  root.traverse((node) => {
+    if (!node.isSkinnedMesh && !node.isMesh) return;
+    // Only outline geometry that has normals.
+    if (!node.geometry?.attributes?.normal) return;
+
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor:     { value: new THREE.Color(color) },
+        uThickness: { value: thickness },
+      },
+      vertexShader: /* glsl */ `
+        uniform float uThickness;
+        #include <common>
+        #include <skinning_pars_vertex>
+        void main() {
+          vec3 inflated = position + normal * uThickness;
+          #include <skinbase_vertex>
+          #include <begin_vertex>
+          transformed = inflated;
+          #include <skinning_vertex>
+          #include <project_vertex>
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uColor;
+        void main() {
+          gl_FragColor = vec4(uColor, 1.0);
+        }
+      `,
+      side: THREE.BackSide,
+      depthWrite: true,
+      skinning: !!node.isSkinnedMesh,
+      fog: false,
+    });
+
+    let outlineMesh;
+    if (node.isSkinnedMesh) {
+      outlineMesh = new THREE.SkinnedMesh(node.geometry, mat);
+      outlineMesh.bind(node.skeleton, node.bindMatrix);
+    } else {
+      outlineMesh = new THREE.Mesh(node.geometry, mat);
+    }
+    outlineMesh.castShadow = false;
+    outlineMesh.receiveShadow = false;
+    // Render outline before the main bear so the bear's front faces draw on top.
+    outlineMesh.renderOrder = -1;
+    created.push({ owner: node, outline: outlineMesh });
+  });
+
+  for (const { owner, outline } of created) {
+    owner.add(outline);
+  }
 }

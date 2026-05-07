@@ -17,6 +17,8 @@ export class Audio {
     this.master = null;
     this.unlocked = false;
     this.muted = false;
+    this._buffers = new Map();   // name -> AudioBuffer (loaded files)
+    this._loading = new Map();   // name -> Promise<void>
   }
 
   unlock() {
@@ -27,7 +29,6 @@ export class Audio {
     this.master = this.ctx.createGain();
     this.master.gain.value = 0.5;
     this.master.connect(this.ctx.destination);
-    // Some browsers create context in 'suspended' state — explicitly resume.
     if (this.ctx.state === 'suspended') this.ctx.resume();
     // iOS Safari: nudge with a 1-sample silent buffer to truly unlock.
     const buf = this.ctx.createBuffer(1, 1, 22050);
@@ -36,10 +37,51 @@ export class Audio {
     src.connect(this.ctx.destination);
     src.start(0);
     this.unlocked = true;
+
+    // Auto-load voice / music files. Each is optional; the play() call falls
+    // back to procedural sound if the file isn't there.
+    this.loadFile('voice_intro', 'assets/audio/voice_intro.mp3');
+    this.loadFile('voice_end',   'assets/audio/voice_end.mp3');
+  }
+
+  // Async-load an audio file into a named buffer slot.
+  loadFile(name, url, gain = 1.0) {
+    if (!this.unlocked) return Promise.resolve();
+    if (this._buffers.has(name) || this._loading.has(name)) {
+      return this._loading.get(name) || Promise.resolve();
+    }
+    const p = (async () => {
+      try {
+        const head = await fetch(url, { method: 'HEAD' });
+        if (!head.ok) return;
+        const r = await fetch(url);
+        const ab = await r.arrayBuffer();
+        const buf = await this.ctx.decodeAudioData(ab);
+        this._buffers.set(name, { buffer: buf, gain });
+        console.info('[audio] loaded:', url);
+      } catch (e) {
+        // silent — buffer simply not available
+      } finally {
+        this._loading.delete(name);
+      }
+    })();
+    this._loading.set(name, p);
+    return p;
   }
 
   play(name) {
     if (!this.unlocked || this.muted || !this.ctx) return;
+
+    // Prefer a loaded audio file over procedural recipe.
+    if (this._buffers.has(name)) return this._playBuffer(name);
+    // If a file is mid-load, queue play for when it arrives.
+    if (this._loading.has(name)) {
+      this._loading.get(name).then(() => {
+        if (this._buffers.has(name)) this._playBuffer(name);
+      });
+      return;
+    }
+
     switch (name) {
       case 'pickup':   return this._pickup();
       case 'gate_pos': return this._gatePos();
@@ -49,6 +91,17 @@ export class Audio {
       case 'fail':     return this._fail();
       case 'shatter':  return this._shatter();
     }
+  }
+
+  _playBuffer(name) {
+    const entry = this._buffers.get(name);
+    if (!entry) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = entry.buffer;
+    const g = this.ctx.createGain();
+    g.gain.value = entry.gain ?? 1.0;
+    src.connect(g).connect(this.master);
+    src.start(0);
   }
 
   // ---------- Stubs for future bg music (left as no-ops) ----------
